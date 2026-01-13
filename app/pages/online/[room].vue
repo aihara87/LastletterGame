@@ -18,7 +18,55 @@
         {{ error }}
       </div>
 
-      <div v-else class="grid lg:grid-cols-3 gap-6">
+      <div v-else>
+        <!-- Waiting Room -->
+        <div v-if="room.status === 'waiting'" class="card max-w-2xl mx-auto text-center py-12">
+          <Icon name="mdi:sofa" class="text-6xl text-purple-200 mb-4" />
+          <h2 class="text-3xl font-bold text-gray-800 mb-2">Waiting Room</h2>
+          <p class="text-gray-600 mb-6">Share this room code with your friends</p>
+          
+          <div class="inline-block bg-purple-50 border-2 border-purple-200 rounded-xl px-6 py-3 mb-8">
+            <p class="text-sm text-purple-600 font-bold uppercase tracking-wider mb-1">Room Code</p>
+            <p class="text-4xl font-mono font-bold text-purple-800 tracking-widest">{{ roomId }}</p>
+          </div>
+
+          <div class="mb-8">
+            <h3 class="font-bold text-lg mb-4 text-gray-700">
+              Players Joined <span class="bg-gray-100 px-2 py-1 rounded text-sm ml-2">{{ room.players.length }} / 6</span>
+            </h3>
+            <div class="flex flex-wrap justify-center gap-3">
+              <div v-for="p in room.players" :key="p.id" class="flex items-center gap-2 bg-white border border-gray-200 shadow-sm px-4 py-2 rounded-full">
+                <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                <span class="font-semibold">{{ p.name }}</span>
+                <span v-if="p.isHost" class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-bold">HOST</span>
+                <span v-if="p.id === playerId" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">YOU</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isHost" class="space-y-3">
+            <button 
+              @click="handleStartGame" 
+              class="btn-primary w-full max-w-xs text-lg py-4 shadow-xl hover:shadow-2xl transition-all disabled:opacity-50 disabled:shadow-none"
+              :disabled="room.players.length < 2 || startPending"
+            >
+              <Icon v-if="startPending" name="mdi:loading" class="animate-spin mr-2" />
+              <Icon v-else name="mdi:play" class="mr-2" />
+              Start Game
+            </button>
+            <p v-if="room.players.length < 2" class="text-sm text-gray-500">
+              Need at least 2 players to start
+            </p>
+          </div>
+          <div v-else class="text-center space-y-2">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            <p class="text-gray-500 font-medium">Waiting for host to start the game...</p>
+          </div>
+        </div>
+
+        <!-- Game Interface -->
+        <div v-else class="grid lg:grid-cols-3 gap-6">
+
         <!-- Players -->
         <div class="card">
           <div class="flex justify-between items-center mb-3">
@@ -107,19 +155,33 @@
       <!-- Game Over Modal -->
       <div v-if="room && !room.isActive" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="card max-w-md mx-4 text-center">
-          <Icon name="mdi:trophy" class="text-8xl text-yellow-500 mx-auto mb-4" />
-          <h2 class="text-3xl font-bold mb-4">Game Over!</h2>
+          <Icon v-if="isWinner" name="mdi:trophy" class="text-8xl text-yellow-500 mx-auto mb-4" />
+          <Icon v-else name="mdi:emoticon-sad" class="text-8xl text-gray-400 mx-auto mb-4" />
+          
+          <h2 class="text-3xl font-bold mb-4" :class="isWinner ? 'text-green-600' : 'text-red-600'">
+            {{ isWinner ? 'You Won!' : 'Game Over!' }}
+          </h2>
+          
           <p class="text-xl mb-6">
             <span v-if="winnerName">Winner: <span class="font-bold text-purple-600">{{ winnerName }}</span></span>
             <span v-else>Game Ended (Timeout)</span>
           </p>
-          <NuxtLink to="/" class="btn-primary w-full">
-            <Icon name="mdi:home" class="inline mr-2" /> Back to Home
-          </NuxtLink>
+          
+          <div class="flex flex-col gap-3">
+            <button v-if="isHost" @click="handleRetryGame" class="btn-success w-full py-3 shadow-lg transform hover:scale-105 transition-all">
+              <Icon name="mdi:replay" class="inline mr-2 text-xl" /> 
+              <span class="font-bold">Retry Game</span>
+            </button>
+            <NuxtLink to="/" class="btn-primary w-full py-3 shadow-lg transform hover:scale-105 transition-all block">
+              <Icon name="mdi:home" class="inline mr-2 text-xl" /> 
+              <span class="font-bold">Back to Home</span>
+            </NuxtLink>
+          </div>
         </div>
       </div>
     </div>
   </div>
+</div>
 </template>
 
 <script setup lang="ts">
@@ -140,13 +202,44 @@ const requiredFirstLetter = computed(() => {
   if (!lastWord.value) return null
   return lastWord.value.slice(-1)
 })
-const isMyTurn = computed(() => room.value?.isActive && room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
+const isMyTurn = computed(() => room.value?.status === 'playing' && room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
+const isHost = computed(() => room.value?.players?.find((p: any) => p.id === playerId)?.isHost)
+const isWinner = computed(() => room.value?.winnerId === playerId)
+const startPending = ref(false)
 
 const winnerName = computed(() => {
   if (!room.value || !room.value.winnerId) return null
   const winner = room.value.players.find((p: any) => p.id === room.value.winnerId)
   return winner ? winner.name : null
 })
+
+const handleStartGame = async () => {
+  if (!room.value || room.value.players.length < 2) return
+  startPending.value = true
+  try {
+    const res: any = await $fetch(`/api/rooms/${roomId}/start`, {
+      method: 'POST',
+      body: { playerId }
+    })
+    room.value = res
+  } catch (err: any) {
+    alert(err?.data?.message || 'Failed to start game')
+  } finally {
+    startPending.value = false
+  }
+}
+
+const handleRetryGame = async () => {
+  try {
+    const res: any = await $fetch(`/api/rooms/${roomId}/retry`, {
+      method: 'POST',
+      body: { playerId }
+    })
+    room.value = res
+  } catch (err: any) {
+    alert(err?.data?.message || 'Failed to retry game')
+  }
+}
 
 const fetchRoom = async () => {
 
