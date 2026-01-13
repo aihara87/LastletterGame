@@ -103,12 +103,28 @@
           </div>
         </div>
       </div>
+
+      <!-- Game Over Modal -->
+      <div v-if="room && !room.isActive" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="card max-w-md mx-4 text-center">
+          <Icon name="mdi:trophy" class="text-8xl text-yellow-500 mx-auto mb-4" />
+          <h2 class="text-3xl font-bold mb-4">Game Over!</h2>
+          <p class="text-xl mb-6">
+            <span v-if="winnerName">Winner: <span class="font-bold text-purple-600">{{ winnerName }}</span></span>
+            <span v-else>Game Ended (Timeout)</span>
+          </p>
+          <NuxtLink to="/" class="btn-primary w-full">
+            <Icon name="mdi:home" class="inline mr-2" /> Back to Home
+          </NuxtLink>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const route = useRoute()
+
 const roomId = route.params.room as string
 const playerId = route.query.playerId as string
 
@@ -124,9 +140,16 @@ const requiredFirstLetter = computed(() => {
   if (!lastWord.value) return null
   return lastWord.value.slice(-1)
 })
-const isMyTurn = computed(() => room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
+const isMyTurn = computed(() => room.value?.isActive && room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
+
+const winnerName = computed(() => {
+  if (!room.value || !room.value.winnerId) return null
+  const winner = room.value.players.find((p: any) => p.id === room.value.winnerId)
+  return winner ? winner.name : null
+})
 
 const fetchRoom = async () => {
+
   try {
     const data = await $fetch(`/api/rooms/${roomId}`)
     room.value = data

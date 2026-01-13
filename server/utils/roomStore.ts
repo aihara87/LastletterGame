@@ -31,6 +31,7 @@ export interface RoomState {
   gameHistory: RoomHistory[]
   usedWords: string[]
   isActive: boolean
+  winnerId: string | null
 }
 
 const rooms = new Map<string, RoomState>()
@@ -47,6 +48,20 @@ const setDeadline = (room: RoomState) => {
     return
   }
   room.turnDeadline = Date.now() + room.timerDuration * 1000
+}
+
+const checkTimeout = (room: RoomState) => {
+  if (!room.isActive || !room.timerEnabled || !room.turnDeadline) return
+
+  if (Date.now() > room.turnDeadline) {
+    room.isActive = false
+    // Winner is the previous player
+    if (room.players.length > 1) {
+      let prevIndex = room.currentPlayerIndex - 1
+      if (prevIndex < 0) prevIndex = room.players.length - 1
+      room.winnerId = room.players[prevIndex].id
+    }
+  }
 }
 
 export const createRoom = (opts: {
@@ -76,7 +91,8 @@ export const createRoom = (opts: {
     currentPlayerIndex: 0,
     gameHistory: [],
     usedWords: [],
-    isActive: true
+    isActive: true,
+    winnerId: null
   }
   setDeadline(room)
   rooms.set(id, room)
@@ -98,11 +114,16 @@ export const joinRoom = (roomId: string, playerName: string) => {
   return { room, playerId }
 }
 
-export const getRoom = (id: string) => rooms.get(id)
+export const getRoom = (id: string) => {
+  const room = rooms.get(id)
+  if (room) checkTimeout(room)
+  return room
+}
 
 export const heartbeat = (id: string, playerId: string) => {
   const room = rooms.get(id)
   if (!room) return null
+  checkTimeout(room)
   const player = room.players.find(p => p.id === playerId)
   if (player) player.lastSeen = Date.now()
   return room
@@ -110,7 +131,11 @@ export const heartbeat = (id: string, playerId: string) => {
 
 export const playWord = async (id: string, playerId: string, wordRaw: string) => {
   const room = rooms.get(id)
-  if (!room || !room.isActive) return { error: 'ROOM_NOT_FOUND' as const }
+  if (!room) return { error: 'ROOM_NOT_FOUND' as const }
+  
+  checkTimeout(room)
+  if (!room.isActive) return { error: 'ROOM_NOT_FOUND' as const }
+
   const playerIdx = room.players.findIndex(p => p.id === playerId)
   if (playerIdx === -1) return { error: 'PLAYER_NOT_FOUND' as const }
   if (playerIdx !== room.currentPlayerIndex) return { error: 'NOT_YOUR_TURN' as const }

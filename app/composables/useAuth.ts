@@ -4,10 +4,15 @@ export interface Admin {
 }
 
 export const useAuth = () => {
-  const admin = useState<Admin>('admin', () => ({
-    username: '',
-    isLoggedIn: false
-  }))
+  // Use cookie for session management with 1 hour expiration
+  const admin = useCookie<Admin>('admin_session', {
+    maxAge: 3600, // 1 hour in seconds
+    sameSite: 'lax',
+    default: () => ({
+      username: '',
+      isLoggedIn: false
+    })
+  })
 
   // Default admin credentials (in production, use encrypted password)
   const DEFAULT_USERNAME = 'admin'
@@ -29,6 +34,9 @@ export const useAuth = () => {
       username: '',
       isLoggedIn: false
     }
+    // Optional: clear cookie explicitly if needed, but setting value works
+    // const cookie = useCookie('admin_session')
+    // cookie.value = null 
   }
 
   const isAuthenticated = computed(() => admin.value.isLoggedIn)
@@ -40,3 +48,4 @@ export const useAuth = () => {
     isAuthenticated
   }
 }
+
