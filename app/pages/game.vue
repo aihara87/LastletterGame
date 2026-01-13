@@ -194,9 +194,10 @@ const {
   stopTimer
 } = useGameState()
 
-const { dictionary, isValidWord, getWordsByFirstLetter } = useDictionary()
+const { dictionary, currentDictionary, isValidWord, getWordsByFirstLetter } = useDictionary()
 
 const inputWord = ref('')
+
 const errorMessage = ref('')
 const isBotThinking = ref(false)
 const showWinnerModal = ref(false)
@@ -287,10 +288,11 @@ const playBotTurn = async () => {
   isBotThinking.value = true
 
   const bot = new BotPlayer(
-    dictionary.value,
+    currentDictionary.value,
     new Set(gameHistory.value.map(h => h.word.toLowerCase())),
     'medium'
   )
+
 
   const botWord = await bot.makeMove(requiredFirstLetter.value || 'a', 1500)
 

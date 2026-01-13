@@ -69,28 +69,46 @@
         <h2 class="text-2xl font-bold text-gray-800 mb-4">
           {{ editingWord ? 'Edit Kata' : 'Tambah Kata Baru' }}
         </h2>
-        <form @submit.prevent="handleSubmit" class="grid md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-gray-700 font-semibold mb-2">Kata</label>
-            <input
-              v-model="formWord"
-              type="text"
-              placeholder="Masukkan kata..."
-              class="input-field"
-              required
-            />
+        
+        <div v-if="message" :class="`mb-4 p-3 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`">
+          <p class="font-bold">
+            <Icon :name="message.type === 'success' ? 'mdi:check-circle' : 'mdi:alert-circle'" class="inline mr-1" />
+            {{ message.text }}
+          </p>
+        </div>
+
+        <form @submit.prevent="handleSubmit">
+          <div class="grid md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label class="block text-gray-700 font-semibold mb-2">Kata</label>
+              <input
+                v-model="formWord"
+                type="text"
+                placeholder="Masukkan kata..."
+                class="input-field"
+                required
+              />
+            </div>
+            <div>
+              <label class="block text-gray-700 font-semibold mb-2">Kategori (Opsional)</label>
+              <input
+                v-model="formCategory"
+                type="text"
+                placeholder="Contoh: hewan, buah, tempat..."
+                class="input-field"
+              />
+            </div>
+            <div>
+              <label class="block text-gray-700 font-semibold mb-2">Bahasa</label>
+              <select v-model="formLanguage" class="input-field">
+                <option value="id">Bahasa Indonesia</option>
+                <option value="en">English</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label class="block text-gray-700 font-semibold mb-2">Kategori (Opsional)</label>
-            <input
-              v-model="formCategory"
-              type="text"
-              placeholder="Contoh: hewan, buah, tempat..."
-              class="input-field"
-            />
-          </div>
-          <div class="flex items-end gap-2">
-            <button type="submit" class="btn-primary flex-1">
+          
+          <div class="flex justify-center gap-2">
+            <button type="submit" class="btn-primary min-w-[200px]">
               <Icon :name="editingWord ? 'mdi:check' : 'mdi:plus'" class="inline mr-2" />
               {{ editingWord ? 'Update' : 'Tambah' }}
             </button>
@@ -100,11 +118,12 @@
               type="button"
               class="px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
             >
-              <Icon name="mdi:close" />
+              <Icon name="mdi:close" class="inline mr-1" /> Batal
             </button>
           </div>
         </form>
       </div>
+
 
       <!-- Import/Export Section -->
       <div class="card mb-6">
@@ -285,10 +304,12 @@
               <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">No</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Kata</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Bahasa</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Kategori</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Tanggal Ditambahkan</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Aksi</th>
               </tr>
+
             </thead>
             <tbody>
               <tr
@@ -299,7 +320,13 @@
                 <td class="px-4 py-3">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
                 <td class="px-4 py-3 font-semibold text-purple-600">{{ word.word }}</td>
                 <td class="px-4 py-3">
+                  <span :class="word.language === 'id' ? 'text-red-600 bg-red-100' : 'text-blue-600 bg-blue-100'" class="px-2 py-1 rounded-md text-xs font-bold uppercase">
+                    {{ word.language || 'id' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
                   <span v-if="word.category" class="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm">
+
                     {{ word.category }}
                   </span>
                   <span v-else class="text-gray-400">-</span>
@@ -371,8 +398,11 @@ const { dictionary, addWord, removeWord, updateWord, importWords } = useDictiona
 
 const formWord = ref('')
 const formCategory = ref('')
+const formLanguage = ref<'id' | 'en'>('id')
 const editingWord = ref<Word | null>(null)
 const searchQuery = ref('')
+const message = ref<{ text: string, type: 'success' | 'error' } | null>(null)
+
 const filterCategory = ref('')
 const sortBy = ref('word-asc')
 const currentPage = ref(1)
@@ -432,24 +462,53 @@ const paginatedWords = computed(() => {
   return filteredWords.value.slice(start, start + itemsPerPage)
 })
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   if (!formWord.value.trim()) return
 
-  if (editingWord.value) {
-    updateWord(editingWord.value.id, formWord.value, formCategory.value || undefined)
-    editingWord.value = null
-  } else {
-    addWord(formWord.value, formCategory.value || undefined)
+  const normalizedWord = formWord.value.trim().toLowerCase()
+  
+  // Check for duplicates
+  const exists = dictionary.value.some(w => 
+    w.word.toLowerCase() === normalizedWord && 
+    w.language === formLanguage.value &&
+    (w.category || '') === (formCategory.value || '')
+  )
+
+  if (exists && (!editingWord.value || (
+      editingWord.value.word.toLowerCase() !== normalizedWord ||
+      editingWord.value.language !== formLanguage.value ||
+      (editingWord.value.category || '') !== (formCategory.value || '')
+  ))) {
+    message.value = { text: `Gagal: Kata "${formWord.value}" dengan kategori tersebut sudah ada!`, type: 'error' }
+    setTimeout(() => message.value = null, 3000)
+    return
+  }
+
+  try {
+    if (editingWord.value) {
+      await updateWord(editingWord.value.id, formWord.value, formCategory.value || undefined, formLanguage.value)
+      editingWord.value = null
+      message.value = { text: 'Kata berhasil diupdate!', type: 'success' }
+    } else {
+      await addWord(formWord.value, formCategory.value || undefined, formLanguage.value)
+      message.value = { text: 'Kata berhasil ditambahkan!', type: 'success' }
+    }
+  } catch (e) {
+    message.value = { text: 'Terjadi kesalahan saat menyimpan.', type: 'error' }
   }
 
   formWord.value = ''
   formCategory.value = ''
+  formLanguage.value = 'id'
+  
+  setTimeout(() => message.value = null, 3000)
 }
 
 const editWord = (word: Word) => {
   editingWord.value = word
   formWord.value = word.word
   formCategory.value = word.category || ''
+  formLanguage.value = word.language || 'id'
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -457,7 +516,9 @@ const cancelEdit = () => {
   editingWord.value = null
   formWord.value = ''
   formCategory.value = ''
+  formLanguage.value = 'id'
 }
+
 
 const deleteWord = (word: Word) => {
   if (confirm(`Apakah Anda yakin ingin menghapus kata "${word.word}"?`)) {
