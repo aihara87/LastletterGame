@@ -1,0 +1,102 @@
+[
+  {
+    "word": "ant",
+    "category": "animal",
+    "language": "en"
+  },
+  {
+    "word": "tiger",
+    "category": "animal",
+    "language": "en"
+  },
+  {
+    "word": "rabbit",
+    "category": "animal",
+    "language": "en"
+  },
+  {
+    "word": "table",
+    "category": "furniture",
+    "language": "en"
+  },
+  {
+    "word": "elephant",
+    "category": "animal",
+    "language": "en"
+  },
+  {
+    "word": "telephone",
+    "category": "device",
+    "language": "en"
+  },
+  {
+    "word": "eagle",
+    "category": "bird",
+    "language": "en"
+  },
+  {
+    "word": "egg",
+    "category": "food",
+    "language": "en"
+  },
+  {
+    "word": "guitar",
+    "category": "instrument",
+    "language": "en"
+  },
+  {
+    "word": "rose",
+    "category": "flower",
+    "language": "en"
+  },
+  {
+    "word": "engine",
+    "category": "machine",
+    "language": "en"
+  },
+  {
+    "word": "earth",
+    "category": "nature",
+    "language": "en"
+  },
+  {
+    "word": "hat",
+    "category": "clothing",
+    "language": "en"
+  },
+  {
+    "word": "tree",
+    "category": "nature",
+    "language": "en"
+  },
+  {
+    "word": "notebook",
+    "category": "stationery",
+    "language": "en"
+  },
+  {
+    "word": "king",
+    "category": "royalty",
+    "language": "en"
+  },
+  {
+    "word": "garden",
+    "category": "place",
+    "language": "en"
+  },
+  {
+    "word": "nurse",
+    "category": "profession",
+    "language": "en"
+  },
+  {
+    "word": "nest",
+    "category": "nature",
+    "language": "en"
+  },
+  {
+    "word": "tiger",
+    "category": "animal",
+    "language": "en"
+  }
+]
