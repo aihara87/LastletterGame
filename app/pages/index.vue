@@ -127,24 +127,6 @@
           </button>
         </div>
 
-        <!-- Bot Setup -->
-        <div v-else class="space-y-4">
-          <input
-            v-model="playerNames[0]"
-            type="text"
-            placeholder="Nama Anda"
-            class="input-field"
-          />
-          
-          <div>
-            <label class="block text-gray-700 font-semibold mb-2">Tingkat Kesulitan Bot:</label>
-            <select v-model="botDifficulty" class="input-field">
-              <option value="easy">Mudah</option>
-              <option value="medium">Sedang</option>
-              <option value="hard">Sulit</option>
-            </select>
-          </div>
-        </div>
 
         <!-- Timer Setup (for both modes) -->
         <div class="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
