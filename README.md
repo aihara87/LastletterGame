@@ -124,7 +124,37 @@ Password: admin123
 - Pagination untuk data besar
 - Dokumentasi lengkap cara import
 
+## 🗄️ Database Setup (Turso)
+
+Project ini menggunakan **Turso (LibSQL)** sebagai database utama untuk menyimpan dictionary kata.
+
+### 1. Setup Turso Database
+1. Daftar/Login di [turso.tech](https://turso.tech)
+2. Buat database baru: `turso db create last-letter-game`
+3. Dapatkan Database URL: `turso db show last-letter-game`
+4. Buat Auth Token: `turso db tokens create last-letter-game`
+
+### 2. Environment Variables
+Buat file `.env` (gunakan `.env.example` sebagai referensi) dan isi kredensial Turso Anda:
+
+```bash
+TURSO_DATABASE_URL="libsql://your-db.turso.io"
+TURSO_AUTH_TOKEN="your-auth-token"
+```
+
+### 3. Migrasi & Seeding
+Jalankan perintah berikut untuk membuat tabel dan mengisi data awal:
+
+```bash
+# Push schema ke Turso
+npx drizzle-kit push
+
+# Start app (akan otomatis seeding data awal jika DB kosong)
+npm run dev
+```
+
 ## 📄 Import Dictionary JSON
+
 
 ### Format File JSON
 
@@ -163,8 +193,10 @@ File contoh tersedia di `/public/example-dictionary.json` atau download langsung
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 - **Icons**: [@nuxt/icon](https://nuxt.com/modules/icon) - Icon module untuk Nuxt
 - **State Management**: Nuxt useState composables
+- **Database**: [Turso (LibSQL)](https://turso.tech) + [Drizzle ORM](https://orm.drizzle.team)
 - **TypeScript**: Type-safe development
 - **Context7**: Untuk dokumentasi module terbaru
+
 
 ## 📂 Struktur Project
 

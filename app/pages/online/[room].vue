@@ -114,10 +114,23 @@
                   {{ room.players[room.currentPlayerIndex]?.name }}
                 </p>
               </div>
-              <div v-if="room.timerEnabled" class="text-center">
-                <p class="text-sm text-gray-600">Time Remaining</p>
-                <p class="text-2xl font-bold text-blue-600">{{ room.timeRemaining ?? '-' }}s</p>
+              <div v-if="room.timerEnabled" class="flex flex-col items-center">
+                <p class="text-sm text-gray-600 mb-1">Time Remaining</p>
+                <div 
+                  class="flex items-center justify-center w-20 h-20 rounded-full border-4 transition-all duration-300"
+                  :class="getTimerColorClass()"
+                >
+                  <div class="text-center">
+                    <Icon 
+                      name="mdi:timer-sand" 
+                      class="text-2xl mb-1"
+                      :class="(room.timeRemaining || 0) <= 5 ? 'animate-bounce' : ''"
+                    />
+                    <p class="font-bold text-xl">{{ room.timeRemaining ?? '-' }}</p>
+                  </div>
+                </div>
               </div>
+
               <div>
                 <p class="text-sm text-gray-600">Dictionary</p>
                 <p class="font-bold text-lg">{{ room.dictionaryLanguage === 'id' ? 'Bahasa Indonesia' : 'English' }}</p>
@@ -272,6 +285,13 @@ const voteCount = computed(() => room.value?.retryVotes?.length || 0)
 const startPending = ref(false)
 const showLeaveModal = ref(false)
 const showHostLeftModal = ref(false)
+
+const getTimerColorClass = () => {
+  const time = room.value?.timeRemaining || 0
+  if (time > 15) return 'border-green-500 text-green-600'
+  if (time > 5) return 'border-yellow-500 text-yellow-600'
+  return 'border-red-500 text-red-600 animate-pulse'
+}
 
 const sortedPlayers = computed(() => {
   if (!room.value?.players) return []
