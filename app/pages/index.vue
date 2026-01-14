@@ -152,21 +152,11 @@
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
               <Icon name="mdi:timer" class="text-2xl text-blue-600" />
-              <label class="text-gray-700 font-semibold">Aktifkan Timer</label>
+              <label class="text-gray-700 font-semibold">Game Timer</label>
             </div>
-            <button
-              @click="timerEnabled = !timerEnabled"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-              :class="timerEnabled ? 'bg-blue-600' : 'bg-gray-300'"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="timerEnabled ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
           </div>
 
-          <div v-if="timerEnabled" class="space-y-3">
+          <div class="space-y-3">
             <div>
               <label class="block text-gray-700 font-semibold mb-2">
                 Waktu per Giliran: {{ timerDuration }} detik
@@ -185,6 +175,10 @@
                 <span>60s</span>
                 <span>120s</span>
               </div>
+
+
+
+
             </div>
             <p class="text-sm text-gray-600">
               <Icon name="mdi:information" class="inline" />
@@ -237,8 +231,9 @@ const { dictionaryLanguage, setDictionaryLanguage } = useDictionary()
 const selectedMode = ref<'pvp' | 'bot' | 'online' | null>(null)
 const playerNames = ref<string[]>(['', ''])
 const botDifficulty = ref<'easy' | 'medium' | 'hard'>('medium')
-const timerEnabled = ref(false)
+const timerEnabled = ref(true)
 const timerDuration = ref(30)
+
 
 const canStartGame = computed(() => {
   if (selectedMode.value === 'online') return playerNames.value[0].trim().length > 0

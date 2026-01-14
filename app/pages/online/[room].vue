@@ -5,10 +5,11 @@
         <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
           Online Room {{ roomId }}
         </h1>
-        <NuxtLink to="/" class="btn-secondary">
-          <Icon name="mdi:home" class="inline mr-2" /> Home
-        </NuxtLink>
+        <button @click="handleLeave" class="btn-danger">
+          <Icon name="mdi:logout" class="inline mr-2" /> Leave Room
+        </button>
       </div>
+
 
       <div v-if="pending" class="text-center py-10 text-gray-500">
         <Icon name="mdi:loading" class="animate-spin text-4xl inline" /> Loading room...
@@ -75,17 +76,31 @@
           </div>
           <div class="space-y-2">
             <div
-              v-for="p in room.players"
+              v-for="p in sortedPlayers"
               :key="p.id"
-              class="flex items-center justify-between p-3 rounded-xl"
-              :class="p.id === room.players[room.currentPlayerIndex]?.id ? 'bg-purple-100 border-2 border-purple-500' : 'bg-gray-50'"
+              class="flex items-center justify-between p-3 rounded-xl transition-all duration-300"
+              :class="[
+
+                p.id === room.players[room.currentPlayerIndex]?.id ? 'bg-purple-100 border-2 border-purple-500 scale-105' : 'bg-gray-50',
+                p.isEliminated ? 'opacity-60 bg-gray-100' : ''
+              ]"
             >
               <div>
-                <p class="font-semibold">{{ p.name }}</p>
-                <p v-if="p.isHost" class="text-xs text-gray-500">Host</p>
+                <div class="flex items-center gap-2">
+                  <p class="font-semibold" :class="{ 'line-through text-gray-500': p.isEliminated }">{{ p.name }}</p>
+                  <div class="flex text-red-500" v-if="!p.isEliminated">
+                    <Icon v-for="i in p.lives" :key="i" name="mdi:heart" class="text-xs" />
+                    <Icon v-for="i in (2 - p.lives)" :key="`lost-${i}`" name="mdi:heart-outline" class="text-xs opacity-50" />
+                  </div>
+                </div>
+                <div class="flex gap-1 flex-wrap">
+                  <span v-if="p.isHost" class="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 rounded">HOST</span>
+                  <span v-if="p.isEliminated" class="text-[10px] bg-red-100 text-red-800 px-1.5 rounded font-bold">OUT</span>
+                </div>
               </div>
               <span class="text-purple-600 font-bold text-xl">{{ p.score }}</span>
             </div>
+
           </div>
         </div>
 
@@ -120,21 +135,34 @@
 
           <div class="card">
             <h3 class="text-xl font-bold text-gray-800 mb-3">Enter Word</h3>
-            <div v-if="!isMyTurn" class="text-gray-500 text-sm mb-2">Waiting for your turn...</div>
-            <form @submit.prevent="submitWord" class="space-y-3">
-              <input
-                v-model="inputWord"
-                type="text"
-                placeholder="Your word"
-                class="input-field"
-                :disabled="!isMyTurn"
-              />
-              <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
-              <button type="submit" class="btn-primary w-full" :disabled="!isMyTurn || !inputWord.trim()">
-                <Icon name="mdi:send" class="inline mr-2" /> Send
-              </button>
-            </form>
+            
+            <div v-if="amIEliminated" class="text-center py-6 bg-gray-50 rounded-xl border-2 border-gray-100">
+              <Icon name="mdi:eye-outline" class="text-4xl text-gray-400 mb-2" />
+              <p class="font-bold text-gray-600">You are eliminated</p>
+              <p class="text-sm text-gray-500">You can still watch the game.</p>
+            </div>
+
+            <div v-else>
+              <div v-if="!isMyTurn" class="text-gray-500 text-sm mb-2 flex items-center gap-2">
+                <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                Waiting for your turn...
+              </div>
+              <form @submit.prevent="submitWord" class="space-y-3">
+                <input
+                  v-model="inputWord"
+                  type="text"
+                  placeholder="Your word"
+                  class="input-field"
+                  :disabled="!isMyTurn"
+                />
+                <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
+                <button type="submit" class="btn-primary w-full" :disabled="!isMyTurn || !inputWord.trim()">
+                  <Icon name="mdi:send" class="inline mr-2" /> Send
+                </button>
+              </form>
+            </div>
           </div>
+
 
           <div class="card">
             <h3 class="text-xl font-bold text-gray-800 mb-3">History</h3>
@@ -168,15 +196,49 @@
           </p>
           
           <div class="flex flex-col gap-3">
-            <button v-if="isHost" @click="handleRetryGame" class="btn-success w-full py-3 shadow-lg transform hover:scale-105 transition-all">
-              <Icon name="mdi:replay" class="inline mr-2 text-xl" /> 
-              <span class="font-bold">Retry Game</span>
+            <div class="bg-gray-100 p-3 rounded-lg mb-2">
+              <p class="text-sm font-semibold text-gray-700 mb-2">Vote to Retry</p>
+              <div class="w-full bg-gray-300 rounded-full h-2.5 mb-1">
+                <div class="bg-green-600 h-2.5 rounded-full transition-all duration-500" :style="{ width: `${(voteCount / room.players.length) * 100}%` }"></div>
+              </div>
+              <p class="text-xs text-gray-500">{{ voteCount }} / {{ room.players.length }} votes</p>
+            </div>
+
+            <button v-if="!hasVoted" @click="handleVoteRetry" class="btn-success w-full py-3 shadow-lg transform hover:scale-105 transition-all">
+              <Icon name="mdi:thumb-up" class="inline mr-2 text-xl" /> 
+              <span class="font-bold">Vote Retry</span>
             </button>
-            <NuxtLink to="/" class="btn-primary w-full py-3 shadow-lg transform hover:scale-105 transition-all block">
+            <div v-else class="text-center text-green-600 font-bold py-2 bg-green-50 rounded-lg border border-green-200">
+              <Icon name="mdi:check" /> Voted
+            </div>
+
+            <button @click="handleLeave" class="btn-primary w-full py-3 shadow-lg transform hover:scale-105 transition-all block">
               <Icon name="mdi:home" class="inline mr-2 text-xl" /> 
               <span class="font-bold">Back to Home</span>
-            </NuxtLink>
+            </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Leave Modal -->
+      <div v-if="showLeaveModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+        <div class="card max-w-sm mx-4 w-full">
+          <h3 class="text-xl font-bold mb-4">Leave Room?</h3>
+          <p class="text-gray-600 mb-6">Are you sure you want to leave this room?</p>
+          <div class="flex gap-3">
+            <button @click="showLeaveModal = false" class="btn-secondary flex-1">Cancel</button>
+            <button @click="confirmLeave" class="btn-danger flex-1">Leave</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Host Left Modal -->
+      <div v-if="showHostLeftModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+        <div class="card max-w-sm mx-4 w-full text-center">
+          <Icon name="mdi:alert-circle" class="text-6xl text-red-500 mx-auto mb-4" />
+          <h3 class="text-xl font-bold mb-2">Room Closed</h3>
+          <p class="text-gray-600 mb-6">The host has closed the room.</p>
+          <NuxtLink to="/" class="btn-primary w-full block">Back to Home</NuxtLink>
         </div>
       </div>
     </div>
@@ -205,7 +267,28 @@ const requiredFirstLetter = computed(() => {
 const isMyTurn = computed(() => room.value?.status === 'playing' && room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
 const isHost = computed(() => room.value?.players?.find((p: any) => p.id === playerId)?.isHost)
 const isWinner = computed(() => room.value?.winnerId === playerId)
+const hasVoted = computed(() => room.value?.retryVotes?.includes(playerId))
+const voteCount = computed(() => room.value?.retryVotes?.length || 0)
 const startPending = ref(false)
+const showLeaveModal = ref(false)
+const showHostLeftModal = ref(false)
+
+const sortedPlayers = computed(() => {
+  if (!room.value?.players) return []
+  return [...room.value.players].sort((a, b) => {
+    // 1. Eliminated status (Alive first)
+    if (a.isEliminated !== b.isEliminated) {
+      return a.isEliminated ? 1 : -1
+    }
+    // 2. Score (High to Low)
+    return b.score - a.score
+  })
+})
+
+const amIEliminated = computed(() => {
+  const me = room.value?.players?.find((p: any) => p.id === playerId)
+  return me?.isEliminated
+})
 
 const winnerName = computed(() => {
   if (!room.value || !room.value.winnerId) return null
@@ -229,16 +312,32 @@ const handleStartGame = async () => {
   }
 }
 
-const handleRetryGame = async () => {
+const handleVoteRetry = async () => {
   try {
-    const res: any = await $fetch(`/api/rooms/${roomId}/retry`, {
+    const res: any = await $fetch(`/api/rooms/${roomId}/vote`, {
       method: 'POST',
       body: { playerId }
     })
     room.value = res
   } catch (err: any) {
-    alert(err?.data?.message || 'Failed to retry game')
+    alert(err?.data?.message || 'Failed to vote')
   }
+}
+
+const handleLeave = () => {
+  showLeaveModal.value = true
+}
+
+const confirmLeave = async () => {
+  try {
+    await $fetch(`/api/rooms/${roomId}/leave`, {
+      method: 'POST',
+      body: { playerId }
+    })
+  } catch (e) {
+    console.error('Failed to leave room', e)
+  }
+  navigateTo('/')
 }
 
 const fetchRoom = async () => {
@@ -249,10 +348,16 @@ const fetchRoom = async () => {
     pending.value = false
     error.value = null
   } catch (err: any) {
+    if (err.statusCode === 404) {
+      if (pollInterval.value) clearInterval(pollInterval.value)
+      showHostLeftModal.value = true
+      return
+    }
     error.value = err?.data?.message || 'Failed to load room'
     pending.value = false
   }
 }
+
 
 const submitWord = async () => {
   if (!inputWord.value.trim()) return

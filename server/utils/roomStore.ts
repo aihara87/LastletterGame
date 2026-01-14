@@ -10,9 +10,12 @@ export interface RoomPlayer {
   score: number
   isHost: boolean
   lastSeen: number
+  isEliminated: boolean
+  lives: number
 }
 
 export interface RoomHistory {
+
   word: string
   playerId: string
   playerName: string
@@ -33,6 +36,7 @@ export interface RoomState {
   isActive: boolean
   winnerId: string | null
   status: 'waiting' | 'playing' | 'finished'
+  retryVotes: string[]
 }
 
 const rooms = new Map<string, RoomState>()
@@ -40,7 +44,14 @@ const randomId = () => crypto.randomUUID().split('-')[0]
 
 const nextPlayerIndex = (room: RoomState) => {
   if (room.players.length === 0) return 0
-  return (room.currentPlayerIndex + 1) % room.players.length
+  let nextIndex = (room.currentPlayerIndex + 1) % room.players.length
+  
+  let attempts = 0
+  while (room.players[nextIndex].isEliminated && attempts < room.players.length) {
+    nextIndex = (nextIndex + 1) % room.players.length
+    attempts++
+  }
+  return nextIndex
 }
 
 const setDeadline = (room: RoomState) => {
@@ -55,16 +66,29 @@ const checkTimeout = (room: RoomState) => {
   if (room.status !== 'playing' || !room.timerEnabled || !room.turnDeadline) return
 
   if (Date.now() > room.turnDeadline) {
-    room.isActive = false
-    room.status = 'finished'
-    // Winner is the previous player
-    if (room.players.length > 1) {
-      let prevIndex = room.currentPlayerIndex - 1
-      if (prevIndex < 0) prevIndex = room.players.length - 1
-      room.winnerId = room.players[prevIndex].id
+    const player = room.players[room.currentPlayerIndex]
+    
+    player.lives = Math.max(0, player.lives - 1)
+    
+    if (player.lives <= 0) {
+      player.isEliminated = true
+    }
+    
+    const activePlayers = room.players.filter(p => !p.isEliminated)
+    
+    if (activePlayers.length <= 1) {
+      room.isActive = false
+      room.status = 'finished'
+      if (activePlayers.length === 1) {
+        room.winnerId = activePlayers[0].id
+      }
+    } else {
+      room.currentPlayerIndex = nextPlayerIndex(room)
+      setDeadline(room)
     }
   }
 }
+
 
 export const createRoom = (opts: {
   playerName: string
@@ -87,15 +111,19 @@ export const createRoom = (opts: {
         name: opts.playerName,
         score: 0,
         isHost: true,
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        isEliminated: false,
+        lives: 2
       }
     ],
+
     currentPlayerIndex: 0,
     gameHistory: [],
     usedWords: [],
     isActive: true,
     winnerId: null,
-    status: 'waiting'
+    status: 'waiting',
+    retryVotes: []
   }
   rooms.set(id, room)
   return { room, playerId }
@@ -111,9 +139,12 @@ export const joinRoom = (roomId: string, playerName: string) => {
     name: playerName,
     score: 0,
     isHost: false,
-    lastSeen: Date.now()
+    lastSeen: Date.now(),
+    isEliminated: false,
+    lives: 2
   })
   return { room, playerId }
+
 }
 
 export const getRoom = (id: string) => {
@@ -141,8 +172,10 @@ export const playWord = async (id: string, playerId: string, wordRaw: string) =>
   const playerIdx = room.players.findIndex(p => p.id === playerId)
   if (playerIdx === -1) return { error: 'PLAYER_NOT_FOUND' as const }
   if (playerIdx !== room.currentPlayerIndex) return { error: 'NOT_YOUR_TURN' as const }
+  if (room.players[playerIdx].isEliminated) return { error: 'PLAYER_ELIMINATED' as const }
 
   const word = wordRaw.toLowerCase().trim()
+
   if (!word) return { error: 'EMPTY_WORD' as const }
 
   if (room.gameHistory.length > 0) {
@@ -198,13 +231,7 @@ export const startGame = (roomId: string, playerId: string) => {
   return { room }
 }
 
-export const retryGame = (roomId: string, playerId: string) => {
-  const room = rooms.get(roomId)
-  if (!room) return { error: 'ROOM_NOT_FOUND' as const }
-  
-  const player = room.players.find(p => p.id === playerId)
-  if (!player || !player.isHost) return { error: 'NOT_HOST' as const }
-  
+const resetRoomState = (room: RoomState) => {
   room.status = 'waiting'
   room.gameHistory = []
   room.usedWords = []
@@ -212,9 +239,88 @@ export const retryGame = (roomId: string, playerId: string) => {
   room.currentPlayerIndex = 0
   room.turnDeadline = null
   room.isActive = true
-  room.players.forEach(p => p.score = 0)
+  room.retryVotes = []
+  room.players.forEach(p => {
+    p.score = 0
+    p.isEliminated = false
+    p.lives = 2
+  })
+}
+
+export const retryGame = (roomId: string, playerId: string) => {
+  const room = rooms.get(roomId)
+  if (!room) return { error: 'ROOM_NOT_FOUND' as const }
+  
+  const player = room.players.find(p => p.id === playerId)
+  if (!player || !player.isHost) return { error: 'NOT_HOST' as const }
+  
+  resetRoomState(room)
   
   return { room }
+}
+
+export const voteRetry = (roomId: string, playerId: string) => {
+  const room = rooms.get(roomId)
+  if (!room) return { error: 'ROOM_NOT_FOUND' as const }
+  if (room.status !== 'finished') return { error: 'GAME_NOT_FINISHED' as const }
+  
+  if (!room.players.some(p => p.id === playerId)) return { error: 'PLAYER_NOT_FOUND' as const }
+  
+  if (!room.retryVotes.includes(playerId)) {
+    room.retryVotes.push(playerId)
+  }
+  
+  // Check majority (> 50%)
+  if (room.retryVotes.length > room.players.length / 2) {
+    resetRoomState(room)
+  }
+  
+  return { room }
+}
+
+export const leaveRoom = (roomId: string, playerId: string) => {
+  const room = rooms.get(roomId)
+  if (!room) return { success: true }
+
+  const playerIndex = room.players.findIndex(p => p.id === playerId)
+  if (playerIndex === -1) return { success: true }
+
+  const player = room.players[playerIndex]
+
+  if (player.isHost) {
+    rooms.delete(roomId)
+    return { success: true, action: 'room_closed' }
+  } else {
+    room.players.splice(playerIndex, 1)
+    
+    // Remove vote if exists
+    const voteIndex = room.retryVotes.indexOf(playerId)
+    if (voteIndex !== -1) room.retryVotes.splice(voteIndex, 1)
+    
+    // Re-check majority if finished
+    if (room.status === 'finished' && room.retryVotes.length > room.players.length / 2) {
+      resetRoomState(room)
+    }
+    
+    if (room.status === 'playing') {
+      if (playerIndex < room.currentPlayerIndex) {
+        room.currentPlayerIndex--
+      } else if (playerIndex === room.currentPlayerIndex) {
+        room.currentPlayerIndex = room.currentPlayerIndex % room.players.length
+        setDeadline(room)
+      }
+      
+      if (room.players.length < 2) {
+        room.status = 'waiting'
+        room.gameHistory = []
+        room.usedWords = []
+        room.currentPlayerIndex = 0
+        room.turnDeadline = null
+      }
+    }
+    
+    return { success: true, action: 'player_left' }
+  }
 }
 
 export const serializeRoom = (room: RoomState) => {
