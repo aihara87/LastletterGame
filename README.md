@@ -107,6 +107,7 @@ npm run preview
 
 ### Login Credentials (Demo)
 ```
+http://[ip/domain]:port/admin/login
 Username: admin
 Password: admin123
 ```
