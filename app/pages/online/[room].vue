@@ -124,9 +124,9 @@
                     <Icon 
                       name="mdi:timer-sand" 
                       class="text-2xl mb-1"
-                      :class="(room.timeRemaining || 0) <= 5 ? 'animate-bounce' : ''"
+                      :class="(localTimeRemaining || 0) <= 5 ? 'animate-bounce' : ''"
                     />
-                    <p class="font-bold text-xl">{{ room.timeRemaining ?? '-' }}</p>
+                    <p class="font-bold text-xl">{{ localTimeRemaining ?? '-' }}</p>
                   </div>
                 </div>
               </div>
@@ -271,6 +271,8 @@ const room = ref<any>(null)
 const pending = ref(true)
 const error = ref<string | null>(null)
 const pollInterval = ref<NodeJS.Timeout | null>(null)
+const timerInterval = ref<NodeJS.Timeout | null>(null)
+const localTimeRemaining = ref<number | null>(null)
 
 const lastWord = computed(() => room.value?.gameHistory?.at(-1)?.word || null)
 const requiredFirstLetter = computed(() => {
@@ -287,7 +289,7 @@ const showLeaveModal = ref(false)
 const showHostLeftModal = ref(false)
 
 const getTimerColorClass = () => {
-  const time = room.value?.timeRemaining || 0
+  const time = localTimeRemaining.value || 0
   if (time > 15) return 'border-green-500 text-green-600'
   if (time > 5) return 'border-yellow-500 text-yellow-600'
   return 'border-red-500 text-red-600 animate-pulse'
@@ -376,6 +378,9 @@ const fetchRoom = async (useHeartbeat = false) => {
     room.value = data
     pending.value = false
     error.value = null
+    
+    // Sync timer with server on each fetch
+    syncTimer()
   } catch (err: any) {
     if (err.statusCode === 404) {
       if (pollInterval.value) clearInterval(pollInterval.value)
@@ -411,15 +416,46 @@ const submitWord = async () => {
 
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 
+// Sync timer from server deadline
+const syncTimer = () => {
+  if (!room.value?.timerEnabled || !room.value?.turnDeadline) {
+    localTimeRemaining.value = null
+    return
+  }
+  const remaining = Math.max(0, Math.round((room.value.turnDeadline - Date.now()) / 1000))
+  localTimeRemaining.value = remaining
+}
+
+// Start local timer countdown
+const startLocalTimer = () => {
+  // Clear existing timer
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+  }
+  
+  // Sync with server first
+  syncTimer()
+  
+  // Countdown every 1 second locally
+  timerInterval.value = setInterval(() => {
+    if (localTimeRemaining.value !== null && localTimeRemaining.value > 0) {
+      localTimeRemaining.value--
+    }
+  }, 1000)
+}
+
 onMounted(async () => {
   if (!playerId) {
     error.value = 'playerId missing'; pending.value = false; return
   }
   await fetchRoom(false) // Initial fetch without heartbeat
+  syncTimer() // Initial sync
+  startLocalTimer() // Start local countdown
   pollInterval.value = setInterval(() => fetchRoom(true), 2000) // Use heartbeat for polling
 })
 
 onUnmounted(() => {
   if (pollInterval.value) clearInterval(pollInterval.value)
+  if (timerInterval.value) clearInterval(timerInterval.value)
 })
 </script>
