@@ -360,10 +360,19 @@ const confirmLeave = async () => {
   navigateTo('/')
 }
 
-const fetchRoom = async () => {
-
+const fetchRoom = async (useHeartbeat = false) => {
   try {
-    const data = await $fetch(`/api/rooms/${roomId}`)
+    let data
+    if (useHeartbeat && playerId) {
+      // Use heartbeat to update lastSeen and get room state
+      data = await $fetch(`/api/rooms/${roomId}/heartbeat`, {
+        method: 'POST',
+        body: { playerId }
+      })
+    } else {
+      // Initial fetch without heartbeat
+      data = await $fetch(`/api/rooms/${roomId}`)
+    }
     room.value = data
     pending.value = false
     error.value = null
@@ -406,8 +415,8 @@ onMounted(async () => {
   if (!playerId) {
     error.value = 'playerId missing'; pending.value = false; return
   }
-  await fetchRoom()
-  pollInterval.value = setInterval(fetchRoom, 2000)
+  await fetchRoom(false) // Initial fetch without heartbeat
+  pollInterval.value = setInterval(() => fetchRoom(true), 2000) // Use heartbeat for polling
 })
 
 onUnmounted(() => {

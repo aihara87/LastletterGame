@@ -8,6 +8,20 @@
       "when": 1768283219397,
       "tag": "0000_chunky_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1768455170342,
+      "tag": "0001_fluffy_khan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1768460761551,
+      "tag": "0002_condemned_blue_blade",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { playerId } = body || {}
   if (!playerId || typeof playerId !== 'string') throw createError({ statusCode: 400, statusMessage: 'Invalid playerId' })
 
-  const result = voteRetry(id, playerId)
+  const result = await voteRetry(id, playerId)
 
   if (result.error) {
     throw createError({ statusCode: 400, statusMessage: result.error })

@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid language' })
   }
 
-  const { room, playerId } = createRoom({
+  const { room, playerId } = await createRoom({
     playerName: playerName.trim(),
     dictionaryLanguage,
     timerEnabled: !!timerEnabled,

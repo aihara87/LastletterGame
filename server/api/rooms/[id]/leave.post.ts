@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { playerId } = body || {}
   if (!playerId || typeof playerId !== 'string') throw createError({ statusCode: 400, statusMessage: 'Invalid playerId' })
 
-  const result = leaveRoom(id, playerId)
+  const result = await leaveRoom(id, playerId)
 
   return result
 })

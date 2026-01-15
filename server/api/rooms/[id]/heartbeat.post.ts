@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { playerId } = body || {}
   if (!playerId || typeof playerId !== 'string') throw createError({ statusCode: 400, statusMessage: 'Invalid playerId' })
 
-  const room = heartbeat(id, playerId)
+  const room = await heartbeat(id, playerId)
   if (!room) throw createError({ statusCode: 404, statusMessage: 'Room not found' })
 
   return serializeRoom(room)

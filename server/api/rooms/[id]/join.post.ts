@@ -11,11 +11,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid player name' })
   }
 
-  const room = getRoom(id)
+  const room = await getRoom(id)
   if (!room) throw createError({ statusCode: 404, statusMessage: 'Room not found' })
   if (room.players.length >= 6) throw createError({ statusCode: 400, statusMessage: 'Room is full' })
 
-  const res = joinRoom(id, playerName.trim())
+  const res = await joinRoom(id, playerName.trim())
   if (!res) throw createError({ statusCode: 400, statusMessage: 'Join failed' })
 
   return { room: serializeRoom(res.room), playerId: res.playerId }
