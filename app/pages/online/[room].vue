@@ -416,13 +416,15 @@ const submitWord = async () => {
 
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 
-// Sync timer from server deadline
+// Sync timer from server deadline (using serverTime to avoid clock skew)
 const syncTimer = () => {
   if (!room.value?.timerEnabled || !room.value?.turnDeadline) {
     localTimeRemaining.value = null
     return
   }
-  const remaining = Math.max(0, Math.round((room.value.turnDeadline - Date.now()) / 1000))
+  // Use serverTime to calculate remaining time accurately
+  const serverTime = room.value.serverTime || Date.now()
+  const remaining = Math.max(0, Math.round((room.value.turnDeadline - serverTime) / 1000))
   localTimeRemaining.value = remaining
 }
 

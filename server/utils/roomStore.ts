@@ -457,12 +457,14 @@ export const leaveRoom = async (roomId: string, playerId: string) => {
 }
 
 export const serializeRoom = (room: RoomState) => {
+  const now = Date.now()
   const timeRemaining = room.turnDeadline && room.timerEnabled
-    ? Math.max(0, Math.round((room.turnDeadline - Date.now()) / 1000))
+    ? Math.max(0, Math.round((room.turnDeadline - now) / 1000))
     : null
   return {
     ...room,
-    timeRemaining
+    timeRemaining,
+    serverTime: now  // Add server timestamp for client sync
   }
 }
 
