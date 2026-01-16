@@ -161,7 +161,8 @@
                 Waiting for your turn...
               </div>
               <form @submit.prevent="submitWord" class="space-y-3">
-                <input
+<input
+                  ref="wordInput"
                   v-model="inputWord"
                   type="text"
                   placeholder="Your word"
@@ -266,6 +267,7 @@ const roomId = route.params.room as string
 const playerId = route.query.playerId as string
 
 const inputWord = ref('')
+const wordInput = ref<HTMLInputElement | null>(null)
 const errorMsg = ref('')
 const room = ref<any>(null)
 const pending = ref(true)
@@ -280,6 +282,15 @@ const requiredFirstLetter = computed(() => {
   return lastWord.value.slice(-1)
 })
 const isMyTurn = computed(() => room.value?.status === 'playing' && room.value?.players?.[room.value.currentPlayerIndex]?.id === playerId)
+
+// Auto-focus input when it's my turn
+watch(isMyTurn, (newValue) => {
+  if (newValue) {
+    nextTick(() => {
+      wordInput.value?.focus()
+    })
+  }
+})
 const isHost = computed(() => room.value?.players?.find((p: any) => p.id === playerId)?.isHost)
 const isWinner = computed(() => room.value?.winnerId === playerId)
 const hasVoted = computed(() => room.value?.retryVotes?.includes(playerId))
