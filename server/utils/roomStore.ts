@@ -12,6 +12,8 @@ export interface RoomPlayer {
   lastSeen: number
   isEliminated: boolean
   lives: number
+  buffItems: number
+  debuffItems: number
 }
 
 export interface RoomHistory {
@@ -36,6 +38,7 @@ export interface RoomState {
   winnerId: string | null
   status: 'waiting' | 'playing' | 'finished'
   retryVotes: string[]
+  lastItemDrop?: { playerId: string, itemType: 'buff' | 'debuff' } | null
 }
 
 const randomId = () => crypto.randomUUID().split('-')[0]
@@ -73,7 +76,9 @@ const getPlayersForRoom = async (roomId: string): Promise<RoomPlayer[]> => {
     isHost: p.isHost,
     lastSeen: p.lastSeen,
     isEliminated: p.isEliminated,
-    lives: p.lives
+    lives: p.lives,
+    buffItems: p.buffItems,
+    debuffItems: p.debuffItems
   }))
 }
 
@@ -113,7 +118,9 @@ const updatePlayerInDb = async (player: RoomPlayer, roomId: string) => {
     isHost: player.isHost,
     lastSeen: player.lastSeen,
     isEliminated: player.isEliminated,
-    lives: player.lives
+    lives: player.lives,
+    buffItems: player.buffItems,
+    debuffItems: player.debuffItems
   }).where(eq(roomPlayers.id, player.id))
 }
 
@@ -209,7 +216,9 @@ export const createRoom = async (opts: {
     lastSeen: now,
     isEliminated: false,
     lives: 2,
-    joinOrder: 0
+    joinOrder: 0,
+    buffItems: 0,
+    debuffItems: 0
   })
   
   const room = await getRoomWithPlayers(id)
@@ -234,7 +243,9 @@ export const joinRoom = async (roomId: string, playerName: string) => {
     lastSeen: now,
     isEliminated: false,
     lives: 2,
-    joinOrder: room.players.length
+    joinOrder: room.players.length,
+    buffItems: 0,
+    debuffItems: 0
   })
   
   const updatedRoom = await getRoomWithPlayers(roomId)
@@ -308,6 +319,20 @@ export const playWord = async (id: string, playerId: string, wordRaw: string) =>
   })
   room.usedWords.push(word)
   room.players[playerIdx].score += 1
+  
+  // 40% chance to get item after correct answer
+  if (Math.random() < 0.4) {
+    const itemType = Math.random() < 0.5 ? 'buff' : 'debuff'
+    if (itemType === 'buff') {
+      room.players[playerIdx].buffItems += 1
+    } else {
+      room.players[playerIdx].debuffItems += 1
+    }
+    room.lastItemDrop = { playerId, itemType }
+  } else {
+    room.lastItemDrop = null
+  }
+  
   room.currentPlayerIndex = nextPlayerIndex(room)
   setDeadline(room)
 
@@ -454,6 +479,60 @@ export const leaveRoom = async (roomId: string, playerId: string) => {
     
     return { success: true, action: 'player_left' }
   }
+}
+
+// Use buff item (+3 points to self)
+export const useBuff = async (roomId: string, playerId: string) => {
+  const room = await getRoomWithPlayers(roomId)
+  if (!room) throw new Error('Room not found')
+  
+  const playerIdx = room.players.findIndex(p => p.id === playerId)
+  if (playerIdx === -1) throw new Error('Player not found')
+  
+  if (room.players[playerIdx].buffItems <= 0) {
+    throw new Error('No buff items')
+  }
+  
+  // Use buff: -1 item, +3 score
+  room.players[playerIdx].buffItems -= 1
+  room.players[playerIdx].score += 3
+  
+  await updateRoomInDb(room)
+  await updatePlayerInDb(room.players[playerIdx], room.id)
+  
+  const updatedRoom = await getRoomWithPlayers(roomId)
+  return updatedRoom
+}
+
+// Use debuff item (-2 points to target)
+export const useDebuff = async (roomId: string, playerId: string, targetPlayerId: string) => {
+  const room = await getRoomWithPlayers(roomId)
+  if (!room) throw new Error('Room not found')
+  
+  const playerIdx = room.players.findIndex(p => p.id === playerId)
+  if (playerIdx === -1) throw new Error('Player not found')
+  
+  if (room.players[playerIdx].debuffItems <= 0) {
+    throw new Error('No debuff items')
+  }
+  
+  const targetIdx = room.players.findIndex(p => p.id === targetPlayerId)
+  if (targetIdx === -1) throw new Error('Target not found')
+  
+  if (targetPlayerId === playerId) {
+    throw new Error('Cannot debuff yourself')
+  }
+  
+  // Use debuff: -1 item, -2 score to target (min 0)
+  room.players[playerIdx].debuffItems -= 1
+  room.players[targetIdx].score = Math.max(0, room.players[targetIdx].score - 2)
+  
+  await updateRoomInDb(room)
+  await updatePlayerInDb(room.players[playerIdx], room.id)
+  await updatePlayerInDb(room.players[targetIdx], room.id)
+  
+  const updatedRoom = await getRoomWithPlayers(roomId)
+  return updatedRoom
 }
 
 export const serializeRoom = (room: RoomState) => {

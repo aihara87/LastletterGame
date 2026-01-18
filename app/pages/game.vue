@@ -80,6 +80,30 @@
           </div>
         </div>
 
+        <!-- Inventory Section (Player Items) -->
+        <div v-if="!currentPlayer?.isBot && players[0]" class="card">
+          <h3 class="text-lg font-bold text-gray-800 mb-3">Your Items</h3>
+          <div class="flex gap-2">
+            <button 
+              @click="() => useBuff(players[0].id)" 
+              :disabled="!players[0].buffItems || players[0].buffItems <= 0"
+              class="flex-1 px-3 py-2 rounded-lg font-bold text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="players[0].buffItems && players[0].buffItems > 0 ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:scale-105 shadow-lg' : 'bg-gray-200 text-gray-500'"
+            >
+              ⚡ Buff (+3) × {{ players[0].buffItems || 0 }}
+            </button>
+            
+            <button 
+              @click="() => players[1] && useDebuff(players[0].id, players[1].id)" 
+              :disabled="!players[0].debuffItems || players[0].debuffItems <= 0 || !players[1]"
+              class="flex-1 px-3 py-2 rounded-lg font-bold text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="players[0].debuffItems && players[0].debuffItems > 0 ? 'bg-gradient-to-r from-pink-500 to-red-500 text-white hover:scale-105 shadow-lg' : 'bg-gray-200 text-gray-500'"
+            >
+              💀 Debuff (-2) × {{ players[0].debuffItems || 0 }}
+            </button>
+          </div>
+        </div>
+
         <!-- Game Board -->
         <div class="lg:col-span-2">
           <!-- Input Area -->
@@ -168,6 +192,14 @@
           </div>
         </div>
       </div>
+
+      <!-- Item Notification -->
+      <div v-if="itemNotification" class="fixed top-20 right-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 rounded-lg shadow-2xl z-50 animate-slide-in-right">
+        <div class="flex items-center gap-3">
+          <Icon name="mdi:gift" class="text-2xl" />
+          <p class="font-bold">{{ itemNotification }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -187,6 +219,9 @@ const {
   timeRemaining,
   addToHistory,
   incrementScore,
+  giveItem,
+  useBuff,
+  useDebuff,
   nextPlayer,
   resetGame,
   isWordUsed,
@@ -202,12 +237,19 @@ const errorMessage = ref('')
 const isBotThinking = ref(false)
 const showWinnerModal = ref(false)
 const winner = ref('')
+const itemNotification = ref('')
 
 // Timer color based on remaining time
 const getTimerColorClass = () => {
   if (timeRemaining.value > 15) return 'border-green-500 text-green-600'
   if (timeRemaining.value > 5) return 'border-yellow-500 text-yellow-600'
   return 'border-red-500 text-red-600 animate-pulse'
+}
+
+// Show notification helper
+const showNotification = (msg: string) => {
+  itemNotification.value = msg
+  setTimeout(() => { itemNotification.value = '' }, 3000)
 }
 
 // Handle timer timeout
@@ -280,6 +322,15 @@ const submitWord = () => {
   // Valid word, add to history
   addToHistory(word, currentPlayer.value!.name)
   incrementScore(currentPlayer.value!.id)
+  
+  // 40% chance to get item after correct answer
+  if (Math.random() < 0.4) {
+    const itemType = Math.random() < 0.5 ? 'buff' : 'debuff'
+    giveItem(currentPlayer.value!.id, itemType)
+    const itemName = itemType === 'buff' ? 'Buff ⚡' : 'Debuff 💀'
+    showNotification(`You got a ${itemName}!`)
+  }
+  
   inputWord.value = ''
   nextPlayer()
 }
@@ -299,6 +350,22 @@ const playBotTurn = async () => {
   if (botWord) {
     addToHistory(botWord, currentPlayer.value!.name)
     incrementScore(currentPlayer.value!.id)
+    
+    // 40% chance bot gets item after correct answer
+    if (Math.random() < 0.4) {
+      const itemType = Math.random() < 0.5 ? 'buff' : 'debuff'
+      // Bot auto-uses items immediately
+      if (itemType === 'buff') {
+        // Give buff and immediately use it
+        players.value[1].score += 3
+        showNotification('Bot used Buff! +3 points')
+      } else {
+        // Give debuff and immediately use it on player
+        players.value[0].score = Math.max(0, players.value[0].score - 2)
+        showNotification('Bot debuffed you! -2 points')
+      }
+    }
+    
     nextPlayer()
   } else {
     // Bot loses

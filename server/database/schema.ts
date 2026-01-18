@@ -37,5 +37,7 @@ export const roomPlayers = sqliteTable('room_players', {
   lastSeen: integer('last_seen').notNull(),
   isEliminated: integer('is_eliminated', { mode: 'boolean' }).notNull().default(false),
   lives: integer('lives').notNull().default(2),
-  joinOrder: integer('join_order').notNull().default(0) // To maintain player order
+  joinOrder: integer('join_order').notNull().default(0), // To maintain player order
+  buffItems: integer('buff_items').default(0), // Power-up items (+3 points) - nullable for existing records
+  debuffItems: integer('debuff_items').default(0) // Sabotage items (-2 points to target) - nullable for existing records
 })

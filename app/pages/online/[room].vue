@@ -104,6 +104,36 @@
           </div>
         </div>
 
+        <!-- Inventory Section -->
+        <div v-if="myPlayer && room.status === 'playing'" class="card">
+          <h3 class="text-xl font-bold text-gray-800 mb-3">Your Items</h3>
+          <div class="flex gap-2">
+            <button 
+              @click="useBuff" 
+              :disabled="!myPlayer.buffItems || myPlayer.buffItems <= 0"
+              class="flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="myPlayer.buffItems && myPlayer.buffItems > 0 ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:scale-105 shadow-lg' : 'bg-gray-200 text-gray-500'"
+            >
+              ⚡ Buff (+3) × {{ myPlayer.buffItems || 0 }}
+            </button>
+            
+            <button 
+              v-if="myPlayer.debuffItems && myPlayer.debuffItems > 0"
+              @click="showDebuffModal = true"
+              class="flex-1 px-4 py-3 rounded-lg font-bold bg-gradient-to-r from-pink-500 to-red-500 text-white hover:scale-105 transition-all duration-300 shadow-lg"
+            >
+              💀 Debuff (-2) × {{ myPlayer.debuffItems }}
+            </button>
+            <button 
+              v-else
+              disabled
+              class="flex-1 px-4 py-3 rounded-lg font-bold bg-gray-200 text-gray-500 opacity-50 cursor-not-allowed"
+            >
+              💀 Debuff (-2) × 0
+            </button>
+          </div>
+        </div>
+
         <!-- Game area -->
         <div class="lg:col-span-2 space-y-4">
           <div class="card">
@@ -255,6 +285,34 @@
           <NuxtLink to="/" class="btn-primary w-full block">Back to Home</NuxtLink>
         </div>
       </div>
+
+      <!-- Debuff Target Modal -->
+      <div v-if="showDebuffModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+        <div class="card max-w-md mx-4 w-full">
+          <h3 class="text-xl font-bold mb-4">Choose Target for Debuff</h3>
+          <p class="text-sm text-gray-600 mb-4">Select a player to reduce their score by 2 points</p>
+          <div class="space-y-2 mb-4">
+            <button 
+              v-for="player in otherPlayers" 
+              :key="player.id"
+              @click="useDebuff(player.id)"
+              class="w-full p-3 rounded-lg bg-gradient-to-r from-pink-100 to-red-100 hover:from-pink-200 hover:to-red-200 transition-all duration-300 flex justify-between items-center"
+            >
+              <span class="font-semibold">{{ player.name }}</span>
+              <span class="text-purple-600 font-bold">{{ player.score }} pts</span>
+            </button>
+          </div>
+          <button @click="showDebuffModal = false" class="btn-secondary w-full">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Item Notification -->
+      <div v-if="itemNotification" class="fixed top-20 right-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 rounded-lg shadow-2xl z-50 animate-slide-in-right">
+        <div class="flex items-center gap-3">
+          <Icon name="mdi:gift" class="text-2xl" />
+          <p class="font-bold">{{ itemNotification }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -298,6 +356,16 @@ const voteCount = computed(() => room.value?.retryVotes?.length || 0)
 const startPending = ref(false)
 const showLeaveModal = ref(false)
 const showHostLeftModal = ref(false)
+const showDebuffModal = ref(false)
+const itemNotification = ref('')
+
+const myPlayer = computed(() => 
+  room.value?.players?.find((p: any) => p.id === playerId)
+)
+
+const otherPlayers = computed(() => 
+  room.value?.players?.filter((p: any) => p.id !== playerId && !p.isEliminated) || []
+)
 
 const getTimerColorClass = () => {
   const time = localTimeRemaining.value || 0
@@ -371,6 +439,40 @@ const confirmLeave = async () => {
     console.error('Failed to leave room', e)
   }
   navigateTo('/')
+}
+
+const useBuff = async () => {
+  if (!myPlayer.value?.buffItems || myPlayer.value.buffItems <= 0) return
+  try {
+    const res: any = await $fetch(`/api/rooms/${roomId}/use-buff`, {
+      method: 'POST',
+      body: { playerId }
+    })
+    room.value = res
+    showNotification('⚡ Buff activated! +3 points')
+  } catch (err: any) {
+    errorMsg.value = err?.data?.message || 'Failed to use buff'
+  }
+}
+
+const useDebuff = async (targetId: string) => {
+  if (!myPlayer.value?.debuffItems || myPlayer.value.debuffItems <= 0) return
+  try {
+    const res: any = await $fetch(`/api/rooms/${roomId}/use-debuff`, {
+      method: 'POST',
+      body: { playerId, targetPlayerId: targetId }
+    })
+    room.value = res
+    showDebuffModal.value = false
+    showNotification('💀 Debuff sent!')
+  } catch (err: any) {
+    errorMsg.value = err?.data?.message || 'Failed to use debuff'
+  }
+}
+
+const showNotification = (msg: string) => {
+  itemNotification.value = msg
+  setTimeout(() => { itemNotification.value = '' }, 3000)
 }
 
 const fetchRoom = async (useHeartbeat = false) => {
@@ -456,6 +558,14 @@ const startLocalTimer = () => {
     }
   }, 1000)
 }
+
+// Watch for item drops and show notification
+watch(() => room.value?.lastItemDrop, (drop) => {
+  if (drop && drop.playerId === playerId) {
+    const itemName = drop.itemType === 'buff' ? 'Buff ⚡' : 'Debuff 💀'
+    showNotification(`You got a ${itemName}!`)
+  }
+})
 
 onMounted(async () => {
   if (!playerId) {
