@@ -385,6 +385,8 @@ const resetRoomState = async (room: RoomState) => {
     p.score = 0
     p.isEliminated = false
     p.lives = 2
+    p.buffItems = 0
+    p.debuffItems = 0
     await updatePlayerInDb(p, room.id)
   }
   
