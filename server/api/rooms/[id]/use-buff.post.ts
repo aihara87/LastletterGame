@@ -1,4 +1,4 @@
-import { useBuff, serializeRoom } from '~/server/utils/roomStore'
+import { useBuff, serializeRoom } from '../../../utils/roomStore'
 
 export default defineEventHandler(async (event) => {
   const roomId = getRouterParam(event, 'id')

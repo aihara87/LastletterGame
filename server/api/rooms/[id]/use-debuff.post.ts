@@ -1,4 +1,4 @@
-import { useDebuff, serializeRoom } from '~/server/utils/roomStore'
+import { useDebuff, serializeRoom } from '../../../utils/roomStore'
 
 export default defineEventHandler(async (event) => {
   const roomId = getRouterParam(event, 'id')
