@@ -4,8 +4,6 @@ export interface Player {
   score: number
   isBot: boolean
   avatar?: string
-  buffItems: number
-  debuffItems: number
 }
 
 export interface GameHistory {
@@ -49,9 +47,7 @@ export const useGameState = () => {
       name,
       score: 0,
       isBot: mode === 'bot' && index > 0,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      buffItems: 0,
-      debuffItems: 0
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
     }))
     currentPlayerIndex.value = 0
     gameHistory.value = []
@@ -78,40 +74,6 @@ export const useGameState = () => {
     if (player) {
       player.score++
     }
-  }
-
-  const giveItem = (playerId: string, itemType: 'buff' | 'debuff') => {
-    const player = players.value.find(p => p.id === playerId)
-    if (player) {
-      if (itemType === 'buff') {
-        player.buffItems++
-      } else {
-        player.debuffItems++
-      }
-      return true
-    }
-    return false
-  }
-
-  const useBuff = (playerId: string) => {
-    const player = players.value.find(p => p.id === playerId)
-    if (player && player.buffItems > 0) {
-      player.buffItems--
-      player.score += 3
-      return true
-    }
-    return false
-  }
-
-  const useDebuff = (playerId: string, targetId: string) => {
-    const player = players.value.find(p => p.id === playerId)
-    const target = players.value.find(p => p.id === targetId)
-    if (player && target && player.debuffItems > 0 && playerId !== targetId) {
-      player.debuffItems--
-      target.score = Math.max(0, target.score - 2)
-      return true
-    }
-    return false
   }
 
   const nextPlayer = () => {
@@ -200,9 +162,6 @@ export const useGameState = () => {
     initGame,
     addToHistory,
     incrementScore,
-    giveItem,
-    useBuff,
-    useDebuff,
     nextPlayer,
     resetGame,
     isWordUsed,

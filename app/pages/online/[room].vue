@@ -110,18 +110,21 @@
           <div class="flex gap-2">
             <button 
               @click="useBuff" 
-              :disabled="!myPlayer.buffItems || myPlayer.buffItems <= 0"
+              :disabled="!myPlayer.buffItems || myPlayer.buffItems <= 0 || isUsingBuff"
               class="flex-1 px-4 py-3 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               :class="myPlayer.buffItems && myPlayer.buffItems > 0 ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white hover:scale-105 shadow-lg' : 'bg-gray-200 text-gray-500'"
             >
+              <Icon v-if="isUsingBuff" name="mdi:loading" class="animate-spin inline mr-1" />
               ⚡ Buff (+3) × {{ myPlayer.buffItems || 0 }}
             </button>
             
             <button 
               v-if="myPlayer.debuffItems && myPlayer.debuffItems > 0"
               @click="showDebuffModal = true"
-              class="flex-1 px-4 py-3 rounded-lg font-bold bg-gradient-to-r from-pink-500 to-red-500 text-white hover:scale-105 transition-all duration-300 shadow-lg"
+              :disabled="isUsingDebuff"
+              class="flex-1 px-4 py-3 rounded-lg font-bold bg-gradient-to-r from-pink-500 to-red-500 text-white hover:scale-105 transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <Icon v-if="isUsingDebuff" name="mdi:loading" class="animate-spin inline mr-1" />
               💀 Debuff (-2) × {{ myPlayer.debuffItems }}
             </button>
             <button 
@@ -358,6 +361,8 @@ const showLeaveModal = ref(false)
 const showHostLeftModal = ref(false)
 const showDebuffModal = ref(false)
 const itemNotification = ref('')
+const isUsingBuff = ref(false)
+const isUsingDebuff = ref(false)
 
 const myPlayer = computed(() => 
   room.value?.players?.find((p: any) => p.id === playerId)
@@ -443,6 +448,9 @@ const confirmLeave = async () => {
 
 const useBuff = async () => {
   if (!myPlayer.value?.buffItems || myPlayer.value.buffItems <= 0) return
+  if (isUsingBuff.value) return // Prevent spam
+  
+  isUsingBuff.value = true
   try {
     const res: any = await $fetch(`/api/rooms/${roomId}/use-buff`, {
       method: 'POST',
@@ -452,11 +460,16 @@ const useBuff = async () => {
     showNotification('⚡ Buff activated! +3 points')
   } catch (err: any) {
     errorMsg.value = err?.data?.message || 'Failed to use buff'
+  } finally {
+    isUsingBuff.value = false
   }
 }
 
 const useDebuff = async (targetId: string) => {
   if (!myPlayer.value?.debuffItems || myPlayer.value.debuffItems <= 0) return
+  if (isUsingDebuff.value) return // Prevent spam
+  
+  isUsingDebuff.value = true
   try {
     const res: any = await $fetch(`/api/rooms/${roomId}/use-debuff`, {
       method: 'POST',
@@ -467,6 +480,8 @@ const useDebuff = async (targetId: string) => {
     showNotification('💀 Debuff sent!')
   } catch (err: any) {
     errorMsg.value = err?.data?.message || 'Failed to use debuff'
+  } finally {
+    isUsingDebuff.value = false
   }
 }
 
@@ -564,6 +579,14 @@ watch(() => room.value?.lastItemDrop, (drop) => {
   if (drop && drop.playerId === playerId) {
     const itemName = drop.itemType === 'buff' ? 'Buff ⚡' : 'Debuff 💀'
     showNotification(`You got a ${itemName}!`)
+  }
+})
+
+// Clear input when turn changes from me to someone else
+watch(isMyTurn, (newValue, oldValue) => {
+  if (oldValue === true && newValue === false) {
+    inputWord.value = ''
+    errorMsg.value = ''
   }
 })
 
