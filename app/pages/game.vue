@@ -166,7 +166,6 @@
               Kembali ke Home
             </button>
           </div>
-          </div>
         </div>
       </div>
     </div>
